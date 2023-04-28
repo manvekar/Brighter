@@ -76,14 +76,16 @@ namespace Paramore.Brighter
             if (!written)
                 throw new ChannelFailureException($"Could not write request {request.Id} to the outbox");
             Activity.Current?.AddEvent(new ActivityEvent(ADDMESSAGETOOUTBOX,
-                tags: new ActivityTagsCollection() {{"MessageId", message.Id}}));
+                tags: new ActivityTagsCollection {{"MessageId", message.Id}}));
         }
 
         internal async Task AddToOutboxAsync(IEnumerable<Message> messages, bool continueOnCapturedContext, CancellationToken cancellationToken, IAmABoxTransactionConnectionProvider overridingTransactionConnectionProvider = null)
         {
             CheckOutboxOutstandingLimit();
 
+#pragma warning disable CS0618
             if (AsyncOutbox is IAmABulkOutboxAsync<Message> box)
+#pragma warning restore CS0618
             {
                 foreach (var chunk in ChunkMessages(messages))
                 {
@@ -114,14 +116,16 @@ namespace Paramore.Brighter
             if (!written)
                 throw new ChannelFailureException($"Could not write request {request.Id} to the outbox");
             Activity.Current?.AddEvent(new ActivityEvent(ADDMESSAGETOOUTBOX,
-                tags: new ActivityTagsCollection() {{"MessageId", message.Id}}));
+                tags: new ActivityTagsCollection {{"MessageId", message.Id}}));
         }
         
         internal void AddToOutbox(IEnumerable<Message> messages, IAmABoxTransactionConnectionProvider overridingTransactionConnectionProvider = null) 
         {
             CheckOutboxOutstandingLimit();
 
+#pragma warning disable CS0618
             if (OutBox is IAmABulkOutboxSync<Message> box)
+#pragma warning restore CS0618
             {
                 foreach (var chunk in ChunkMessages(messages))
                 {
@@ -211,7 +215,7 @@ namespace Paramore.Brighter
         internal async Task ClearOutboxAsync(
             IEnumerable<Guid> posts, 
             bool continueOnCapturedContext = false,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
 
             if (!HasAsyncOutbox())
@@ -281,7 +285,7 @@ namespace Paramore.Brighter
                     
                     var messages = OutBox.OutstandingMessages(minimumAge, amountToClear, args:args);
                     span?.AddEvent(new ActivityEvent(GETMESSAGESFROMOUTBOX,
-                        tags: new ActivityTagsCollection() {{"Outstanding Messages", messages.Count()}}));
+                        tags: new ActivityTagsCollection {{"Outstanding Messages", messages.Count()}}));
                     s_logger.LogInformation("Found {NumberOfMessages} to clear out of amount {AmountToClear}",
                         messages.Count(), amountToClear);
                     Dispatch(messages);
@@ -365,7 +369,7 @@ namespace Paramore.Brighter
             foreach (var message in posts)
             {
                 Activity.Current?.AddEvent(new ActivityEvent(DISPATCHMESSAGE,
-                    tags: new ActivityTagsCollection() {{"Topic", message.Header.Topic}, {"MessageId", message.Id}}));
+                    tags: new ActivityTagsCollection {{"Topic", message.Header.Topic}, {"MessageId", message.Id}}));
                 s_logger.LogInformation("Decoupled invocation of message: Topic:{Topic} Id:{Id}", message.Header.Topic, message.Id.ToString());
 
                 var producer = ProducerRegistry.LookupByOrDefault(message.Header.Topic);
@@ -394,7 +398,7 @@ namespace Paramore.Brighter
             foreach (var message in posts)
             {
                 Activity.Current?.AddEvent(new ActivityEvent(DISPATCHMESSAGE,
-                    tags: new ActivityTagsCollection() {{"Topic", message.Header.Topic}, {"MessageId", message.Id}}));
+                    tags: new ActivityTagsCollection {{"Topic", message.Header.Topic}, {"MessageId", message.Id}}));
                 s_logger.LogInformation("Decoupled invocation of message: Topic:{Topic} Id:{Id}", message.Header.Topic, message.Id.ToString());
                 
                 var producer = ProducerRegistry.LookupByOrDefault(message.Header.Topic);
@@ -446,7 +450,7 @@ namespace Paramore.Brighter
                     var messages = topicBatch.ToArray();
                     s_logger.LogInformation("Bulk Dispatching {NumberOfMessages} for Topic {TopicName}", messages.Length, topicBatch.Key);
                     span?.AddEvent(new ActivityEvent(BULKDISPATCHMESSAGE,
-                        tags: new ActivityTagsCollection() {{"Topic", topicBatch.Key}, {"Number Of Messages", messages.Length}}));
+                        tags: new ActivityTagsCollection {{"Topic", topicBatch.Key}, {"Number Of Messages", messages.Length}}));
                     var dispatchesMessages = bulkMessageProducer.SendAsync(messages, cancellationToken);
 
                     await foreach (var successfulMessage in dispatchesMessages.WithCancellation(cancellationToken))
@@ -475,7 +479,7 @@ namespace Paramore.Brighter
                     {
                         s_logger.LogInformation("Sent message: Id:{Id}", id.ToString());
                         if (AsyncOutbox != null)
-                            await RetryAsync(async ct => await AsyncOutbox.MarkDispatchedAsync(id, DateTime.UtcNow));
+                            await RetryAsync(async ct => await AsyncOutbox.MarkDispatchedAsync(id, DateTime.UtcNow, cancellationToken: ct));
                     }
                 };
                 return true;
@@ -509,7 +513,9 @@ namespace Paramore.Brighter
         }
         internal bool HasAsyncBulkOutbox()
         {
+#pragma warning disable CS0618
             return AsyncOutbox is IAmABulkOutboxAsync<Message>;
+#pragma warning restore CS0618
         }
 
         internal bool HasOutbox()
@@ -519,7 +525,9 @@ namespace Paramore.Brighter
         
         internal bool HasBulkOutbox()
         {
+#pragma warning disable CS0618
             return OutBox is IAmABulkOutboxSync<Message>;
+#pragma warning restore CS0618
         }
 
         private void OutstandingMessagesCheck()
@@ -576,7 +584,7 @@ namespace Paramore.Brighter
         }
 
         private async Task<bool> RetryAsync(Func<CancellationToken, Task> send, bool continueOnCapturedContext = false,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             var result = await PolicyRegistry.Get<AsyncPolicy>(CommandProcessor.RETRYPOLICYASYNC)
                 .ExecuteAndCaptureAsync(send, cancellationToken, continueOnCapturedContext)

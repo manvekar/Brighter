@@ -30,7 +30,7 @@ namespace GreetingsPorts.Handlers
         
         [RequestLoggingAsync(0, HandlerTiming.Before)]
         [UsePolicyAsync(step:1, policy: Policies.Retry.EXPONENTIAL_RETRYPOLICYASYNC)]
-        public override async Task<AddGreeting> HandleAsync(AddGreeting addGreeting, CancellationToken cancellationToken = default(CancellationToken))
+        public override async Task<AddGreeting> HandleAsync(AddGreeting addGreeting, CancellationToken cancellationToken = default)
         {
             var posts = new List<Guid>();
             
@@ -40,7 +40,7 @@ namespace GreetingsPorts.Handlers
             var transaction = _unitOfWork.BeginOrGetTransaction();
             try
             {
-                var person = await context.LoadAsync<Person>(addGreeting.Name);
+                var person = await context.LoadAsync<Person>(addGreeting.Name, cancellationToken);
                 
                 person.Greetings.Add(addGreeting.Greeting);
 

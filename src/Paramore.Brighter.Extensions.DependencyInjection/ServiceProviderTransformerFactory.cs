@@ -42,14 +42,14 @@ namespace Paramore.Brighter.Extensions.DependencyInjection
         public ServiceProviderTransformerFactory(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            var options = (IBrighterOptions) serviceProvider.GetRequiredService<IBrighterOptions>();
+            var options = serviceProvider.GetRequiredService<IBrighterOptions>();
             if (options == null) _isTransient = false; else _isTransient = options.HandlerLifetime == ServiceLifetime.Transient;  
         }
     
         /// <summary>
         /// Creates a specific transformer on demand
         /// </summary>
-        /// <param name="transformerType">The type of transformer to creeate</param>
+        /// <param name="transformerType">The type of transformer to create</param>
         /// <returns></returns>
         public IAmAMessageTransformAsync Create(Type transformerType)
         {

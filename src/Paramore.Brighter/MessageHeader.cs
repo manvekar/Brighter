@@ -340,7 +340,7 @@ namespace Paramore.Brighter
         }
 
         /// <summary>
-        /// Updates the number of times the message has been seen by the dispatcher; used to determine if it is poisioned and should be discarded.
+        /// Updates the number of times the message has been seen by the dispatcher; used to determine if it is poisoned and should be discarded.
         /// </summary>
         public void UpdateHandledCount()
         {
@@ -376,7 +376,9 @@ namespace Paramore.Brighter
             Bag[MessageTelemetry.SourceHeaderName] = "Brighter"; //ToDo: Plumb in something better than this
             Bag[MessageTelemetry.EventTypeHeaderName] = eventType;
 
+#pragma warning disable CS0618
             UpdateTelemetryFromHeaders();
+#pragma warning restore CS0618
         }
     }
 }

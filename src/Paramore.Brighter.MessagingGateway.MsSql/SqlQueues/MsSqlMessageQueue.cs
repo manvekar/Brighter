@@ -38,7 +38,7 @@ namespace Paramore.Brighter.MessagingGateway.MsSql.SqlQueues
         ///     If false we the default thread synchronization context to run any continuation, if true we re-use the original
         ///     synchronization context.
         ///     Default to false unless you know that you need true, as you risk deadlocks with the originating thread if you Wait
-        ///     or access the Result or otherwise block. You may need the orginating synchronization context if you need to access
+        ///     or access the Result or otherwise block. You may need the originating synchronization context if you need to access
         ///     thread specific storage
         ///     such as HTTPContext
         /// </summary>
@@ -73,7 +73,7 @@ namespace Paramore.Brighter.MessagingGateway.MsSql.SqlQueues
         /// <param name="cancellationToken">The active CancellationToken</param>
         /// <returns></returns>
         public async Task SendAsync(T message, string topic, int timeoutInMilliseconds = -1,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             if (s_logger.IsEnabled(LogLevel.Debug)) s_logger.LogDebug("SendAsync<{CommandType}>(..., {Topic})", typeof(T).FullName, topic);
 
@@ -142,7 +142,7 @@ namespace Paramore.Brighter.MessagingGateway.MsSql.SqlQueues
         /// <param name="cancellationToken"></param>
         /// <returns>The message received -or- ReceivedResult&lt;T&gt;.Empty when no message is waiting</returns>
         public async Task<ReceivedResult<T>> TryReceiveAsync(string topic,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             if (s_logger.IsEnabled(LogLevel.Debug)) s_logger.LogDebug("TryReceiveAsync<{CommandType}>(...)", typeof(T).FullName);
 

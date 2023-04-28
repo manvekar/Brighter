@@ -40,7 +40,7 @@ namespace Paramore.Brighter
     //      Configuration - Allows runtime configuration of a service activator node, including stopping and starting, adding and removing of channels, control of resources allocated to channels.
     //      Heartbeat - A ping to service activator node to determine if it is still 'alive'. The node returns a message over a private queue established by the caller.The message also displays diagnostic information on the health of the node.
     //      Exceptions— Any exceptions generated on the node may be sent by the Control Bus to monitoring systems.
-    //      Statistics— Each service activator node broadcasts statistics about the processig of messages which can be collated by a listener to the control bus to calculate the numnber of messages proceses, average throughput, average time to process a message, and so on.This data is split out by message type, so we can aggregate results.
+    //      Statistics— Each service activator node broadcasts statistics about the processing of messages which can be collated by a listener to the control bus to calculate the nunber of messages processes, average throughput, average time to process a message, and so on.This data is split out by message type, so we can aggregate results.
     /// 
     /// </summary>
     public class ControlBusSender : IAmAControlBusSender, IAmAControlBusSenderAsync, IDisposable
@@ -70,7 +70,7 @@ namespace Paramore.Brighter
             _commandProcessor.Post(request);
         }
 
-        public async Task PostAsync<T>(T request, bool continueOnCapturedContext = false, CancellationToken cancellationToken = default(CancellationToken)) where T : class, IRequest
+        public async Task PostAsync<T>(T request, bool continueOnCapturedContext = false, CancellationToken cancellationToken = default) where T : class, IRequest
         {
             await _commandProcessor.PostAsync(request, continueOnCapturedContext, cancellationToken).ConfigureAwait(continueOnCapturedContext);
         }

@@ -47,7 +47,7 @@ namespace Paramore.Brighter.Inbox.Postgres
         ///     If false we the default thread synchronization context to run any continuation, if true we re-use the original
         ///     synchronization context.
         ///     Default to false unless you know that you need true, as you risk deadlocks with the originating thread if you Wait
-        ///     or access the Result or otherwise block. You may need the orginating synchronization context if you need to access
+        ///     or access the Result or otherwise block. You may need the originating synchronization context if you need to access
         ///     thread specific storage
         ///     such as HTTPContext
         /// </summary>
@@ -152,7 +152,7 @@ namespace Paramore.Brighter.Inbox.Postgres
             }
         }
 
-        public async Task<T> GetAsync<T>(Guid id, string contextKey, int timeoutInMilliseconds = -1, CancellationToken cancellationToken = default(CancellationToken)) where T : class, IRequest
+        public async Task<T> GetAsync<T>(Guid id, string contextKey, int timeoutInMilliseconds = -1, CancellationToken cancellationToken = default) where T : class, IRequest
         {
             var sql = $"SELECT * FROM {_configuration.InBoxTableName} WHERE CommandId = @CommandId AND ContextKey = @ContextKey";
 
@@ -171,7 +171,7 @@ namespace Paramore.Brighter.Inbox.Postgres
                 .ConfigureAwait(ContinueOnCapturedContext);
         }
 
-        public async Task<bool> ExistsAsync<T>(Guid id, string contextKey, int timeoutInMilliseconds = -1, CancellationToken cancellationToken = default(CancellationToken)) where T : class, IRequest
+        public async Task<bool> ExistsAsync<T>(Guid id, string contextKey, int timeoutInMilliseconds = -1, CancellationToken cancellationToken = default) where T : class, IRequest
         {
             var sql = $"SELECT DISTINCT CommandId FROM {_configuration.InBoxTableName} WHERE CommandId = @CommandId AND ContextKey = @ContextKey FETCH FIRST 1 ROWS ONLY";
             var parameters = new[]
