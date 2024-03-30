@@ -17,8 +17,11 @@ public class DynamoDbOutboxOutstandingMessageTests : DynamoDBOutboxBaseTest
 
     public DynamoDbOutboxOutstandingMessageTests()
     {
-        _message = new Message(new MessageHeader(Guid.NewGuid(), "test_topic", MessageType.MT_DOCUMENT), new MessageBody("message body"));
-        _dynamoDbOutbox = new DynamoDbOutbox(Client, new DynamoDbConfiguration(Credentials, RegionEndpoint.EUWest1, OutboxTableName));
+        _message = new Message(
+            new MessageHeader(Guid.NewGuid().ToString(), "test_topic", MessageType.MT_DOCUMENT), 
+            new MessageBody("message body")
+        );
+        _dynamoDbOutbox = new DynamoDbOutbox(Client, new DynamoDbConfiguration(OutboxTableName));
     }
 
     [Fact]
@@ -39,11 +42,11 @@ public class DynamoDbOutboxOutstandingMessageTests : DynamoDBOutboxBaseTest
     }
 
     [Fact]
-    public void When_there_are_outstanding_messages_in_the_outbox()
+    public async Task When_there_are_outstanding_messages_in_the_outbox()
     {
         _dynamoDbOutbox.Add(_message);
 
-        Task.Delay(1000).Wait();
+        await Task.Delay(1000);
 
         var args = new Dictionary<string, object> {{"Topic", "test_topic"}};
 

@@ -34,7 +34,7 @@ namespace Paramore.Brighter.InMemory.Tests.Outbox
     public class OutboxEntryTimeToLiveTests
     {
         [Fact]
-        public void When_expiring_a_cache_entry_no_longer_there()
+        public async Task When_expiring_a_cache_entry_no_longer_there()
         {
             //Arrange
             var outbox = new InMemoryOutbox
@@ -44,7 +44,7 @@ namespace Paramore.Brighter.InMemory.Tests.Outbox
                 ExpirationScanInterval = TimeSpan.FromMilliseconds(100)
             };
             
-            var messageId = Guid.NewGuid();
+            var messageId = Guid.NewGuid().ToString();
             var messageToAdd = new Message(
                 new MessageHeader(messageId, "test_topic", MessageType.MT_DOCUMENT), 
                 new MessageBody("message body"));
@@ -53,21 +53,21 @@ namespace Paramore.Brighter.InMemory.Tests.Outbox
             //Act
             outbox.Add(messageToAdd);
             
-            Task.Delay(500).Wait(); //give the entry to time to expire
+            await Task.Delay(500); //give the entry to time to expire
             
             //Trigger a cache clean
-            outbox.Get(messageId);
+            await outbox.GetAsync(messageId);
             
-            Task.Delay(500).Wait(); //Give the sweep time to run
+            await Task.Delay(500); //Give the sweep time to run
             
-            var message = outbox.Get(messageId);
+            var message = await outbox.GetAsync(messageId);
             
             //Assert
             message.Should().BeNull();
         }
 
         [Fact]
-        public void When_over_ttl_but_no_sweep_run()
+        public async Task When_over_ttl_but_no_sweep_run()
         {
                //Arrange
                var outbox = new InMemoryOutbox
@@ -77,18 +77,18 @@ namespace Paramore.Brighter.InMemory.Tests.Outbox
                    ExpirationScanInterval = TimeSpan.FromMilliseconds(10000)
                };
                
-               var messageId = Guid.NewGuid();
+               var messageId = Guid.NewGuid().ToString();
                var messageToAdd = new Message(
                    new MessageHeader(messageId, "test_topic", MessageType.MT_DOCUMENT), 
                    new MessageBody("message body"));
                
                
                //Act
-               outbox.Add(messageToAdd);
+               await outbox.AddAsync(messageToAdd);
                
-               Task.Delay(50).Wait(); //TTL has passed, but not expired yet
+               await Task.Delay(50); //TTL has passed, but not expired yet
    
-               var message = outbox.Get(messageId);
+               var message = await outbox.GetAsync(messageId);
                
                //Assert
                message.Should().NotBeNull();

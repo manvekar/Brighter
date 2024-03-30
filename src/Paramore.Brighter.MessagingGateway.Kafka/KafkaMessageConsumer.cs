@@ -20,6 +20,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE. */
 #endregion
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -33,7 +34,7 @@ using Paramore.Brighter.Logging;
 
 namespace Paramore.Brighter.MessagingGateway.Kafka
 {
-    /// <inheritdoc />
+    /// <inheritdoc cref="Paramore.Brighter.IAmAMessageConsumer" />
     /// <summary>
     /// Class KafkaMessageConsumer is an implementation of <see cref="IAmAMessageConsumer"/>
     /// and provides the facilities to consume messages from a Kafka broker for a topic
@@ -82,6 +83,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
         /// <param name="readCommittedOffsetsTimeoutMs">Timeout when reading the committed offsets, used when closing a consumer to log where it reached.
         /// Defaults to 5000</param>
         /// <param name="numPartitions">If we are creating missing infrastructure, How many partitions should the topic have. Defaults to 1</param>
+        /// <param name="partitionAssignmentStrategy">What is the strategy for assigning partitions to consumers?</param>
         /// <param name="replicationFactor">If we are creating missing infrastructure, how many in-sync replicas do we need. Defaults to 1</param>
         /// <param name="topicFindTimeoutMs">If we are checking for the existence of the topic, what is the timeout. Defaults to 10000ms</param>
         /// <param name="makeChannels">Should we create infrastructure (topics) where it does not exist or check. Defaults to Create</param>
@@ -98,6 +100,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
             int sweepUncommittedOffsetsIntervalMs = 30000,
             int readCommittedOffsetsTimeoutMs = 5000,
             int numPartitions = 1,
+            PartitionAssignmentStrategy partitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky,
             short replicationFactor = 1,
             int topicFindTimeoutMs = 10000,
             OnMissingChannel makeChannels = OnMissingChannel.Create
@@ -105,7 +108,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
         {
             if (configuration is null)
             {
-                throw new ConfigurationException("You must set a KafkaMessaginGatewayConfiguration to connect to a broker");
+                throw new ConfigurationException("You must set a KafkaMessagingGatewayConfiguration to connect to a broker");
             }
             
             if (routingKey is null)
@@ -132,12 +135,22 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
                 SecurityProtocol = configuration.SecurityProtocol.HasValue ? (Confluent.Kafka.SecurityProtocol?)((int) configuration.SecurityProtocol.Value) : null,
                 SslCaLocation = configuration.SslCaLocation
             };
-            _consumerConfig = new ConsumerConfig(_clientConfig)
+            
+            
+            // We repeat properties because copying them from the ClientConfig modifies the ClientConfig in place 
+            _consumerConfig = new ConsumerConfig()
             {
-                GroupId = groupId,
+                BootstrapServers = string.Join(",", configuration.BootStrapServers), 
                 ClientId = configuration.Name,
+                Debug = configuration.Debug,
+                SaslMechanism = configuration.SaslMechanisms.HasValue ? (Confluent.Kafka.SaslMechanism?)((int)configuration.SaslMechanisms.Value) : null,
+                SaslKerberosPrincipal = configuration.SaslKerberosPrincipal,
+                SaslUsername = configuration.SaslUsername,
+                SaslPassword = configuration.SaslPassword,
+                SecurityProtocol = configuration.SecurityProtocol.HasValue ? (Confluent.Kafka.SecurityProtocol?)((int) configuration.SecurityProtocol.Value) : null,
+                SslCaLocation = configuration.SslCaLocation,
+                GroupId = groupId,
                 AutoOffsetReset = offsetDefault,
-                BootstrapServers = string.Join(",", configuration.BootStrapServers),
                 SessionTimeoutMs = sessionTimeoutMs,
                 MaxPollIntervalMs = maxPollIntervalMs,
                 EnablePartitionEof = true,
@@ -147,7 +160,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
                 EnableAutoOffsetStore = false,
                 EnableAutoCommit = false,
                 // https://www.confluent.io/blog/cooperative-rebalancing-in-kafka-streams-consumer-ksqldb/
-                PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky,
+                PartitionAssignmentStrategy = partitionAssignmentStrategy,
             };
 
             _maxBatchSize = commitBatchSize;
@@ -165,7 +178,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
                 })
                 .SetPartitionsRevokedHandler((consumer, list) =>
                 {
-                    _consumer.Commit(list);
+                    consumer.Commit(list);
                     var revokedPartitions = list.Select(tpo => $"{tpo.Topic} : {tpo.Partition}").ToList();
                     
                     s_logger.LogInformation("Partitions for consumer revoked {Channels}", string.Join(",", revokedPartitions));
@@ -187,7 +200,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
                 })
                 .Build();
 
-            s_logger.LogInformation("Kakfa consumer subscribing to {Topic}", Topic);
+            s_logger.LogInformation("Kafka consumer subscribing to {Topic}", Topic);
             _consumer.Subscribe(new []{ Topic.Value });
 
             _creator = new KafkaMessageCreator();
@@ -247,8 +260,6 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
         /// There is no 'queue' to purge in Kafka, so we treat this as moving past to the offset to tne end of any assigned partitions,
         /// thus skipping over anything that exists at that point.
         /// </summary>
-        /// <param name="message">The message.</param>
-        /// <param name="requeue">if set to <c>true</c> [requeue].</param>
         public void Purge()
         {
             if (!_consumer.Assignment.Any())
@@ -267,7 +278,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
         /// </summary>
         /// <param name="timeoutInMilliseconds">The timeout in milliseconds.</param>
         /// <returns>A Brighter message wrapping the payload from the Kafka stream</returns>
-        // <exception cref="ChannelFailureException">We catch Kafka consumer errors and rethrow as a ChannelFailureException </exception>
+        /// <exception cref="ChannelFailureException">We catch Kafka consumer errors and rethrow as a ChannelFailureException </exception>
         public Message[] Receive(int timeoutInMilliseconds)
         {
             try
@@ -283,7 +294,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
                 {
                     CheckHasPartitions();
                     
-                    s_logger.LogDebug($"No messages available from Kafka stream");
+                    s_logger.LogDebug("No messages available from Kafka stream");
                     return new Message[] {new Message()};
                 }
 
@@ -331,7 +342,6 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
         /// Rejects the specified message. This is just a commit of the offset to move past the record without processing it
         /// </summary>
         /// <param name="message">The message.</param>
-        /// <param name="requeue">if set to <c>true</c> [requeue].</param>
         public void Reject(Message message)
         {
             Acknowledge(message);
@@ -409,53 +419,68 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
         /// </summary>
         private void CommitOffsets()
         {
-           
-           var listOffsets = new List<TopicPartitionOffset>();
-           for (int i = 0; i < _maxBatchSize; i++)
-           {
-               bool hasOffsets = _offsetStorage.TryTake(out var offset);
-               if (hasOffsets)
-                   listOffsets.Add(offset);
-               else
-                   break;
+            try
+            {
+                var listOffsets = new List<TopicPartitionOffset>();
+                for (int i = 0; i < _maxBatchSize; i++)
+                {
+                    bool hasOffsets = _offsetStorage.TryTake(out var offset);
+                    if (hasOffsets)
+                        listOffsets.Add(offset);
+                    else
+                        break;
 
-           }
-           
-           if (s_logger.IsEnabled(LogLevel.Information))
-           {
-               var offsets = listOffsets.Select(tpo => $"Topic: {tpo.Topic} Partition: {tpo.Partition.Value} Offset: {tpo.Offset.Value}");
-               var offsetAsString = string.Join(Environment.NewLine, offsets);
-               s_logger.LogInformation("Commiting offsets: {0} {Offset}", Environment.NewLine, offsetAsString);
-           }
-           
-           _consumer.Commit(listOffsets);
-           _flushToken.Release(1);
+                }
+
+                if (s_logger.IsEnabled(LogLevel.Information))
+                {
+                    var offsets = listOffsets.Select(tpo =>
+                        $"Topic: {tpo.Topic} Partition: {tpo.Partition.Value} Offset: {tpo.Offset.Value}");
+                    var offsetAsString = string.Join(Environment.NewLine, offsets);
+                    s_logger.LogInformation("Commiting offsets: {0} {Offset}", Environment.NewLine, offsetAsString);
+                }
+
+                _consumer.Commit(listOffsets);
+            }
+            finally
+            {
+                _flushToken.Release(1);
+            }
         }
         
         private void CommitAllOffsets(DateTime flushTime)
         {
-            var listOffsets = new List<TopicPartitionOffset>();
-            var currentOffsetsInBag = _offsetStorage.Count; 
-            for (int i = 0; i < currentOffsetsInBag; i++)
+            try
             {
-                bool hasOffsets = _offsetStorage.TryTake(out var offset);
-                if (hasOffsets)
-                    listOffsets.Add(offset);
-                else
-                    break;
 
+
+                var listOffsets = new List<TopicPartitionOffset>();
+                var currentOffsetsInBag = _offsetStorage.Count;
+                for (int i = 0; i < currentOffsetsInBag; i++)
+                {
+                    bool hasOffsets = _offsetStorage.TryTake(out var offset);
+                    if (hasOffsets)
+                        listOffsets.Add(offset);
+                    else
+                        break;
+
+                }
+
+                if (s_logger.IsEnabled(LogLevel.Information))
+                {
+                    var offsets = listOffsets.Select(tpo =>
+                        $"Topic: {tpo.Topic} Partition: {tpo.Partition.Value} Offset: {tpo.Offset.Value}");
+                    var offsetAsString = string.Join(Environment.NewLine, offsets);
+                    s_logger.LogInformation("Sweeping offsets: {0} {Offset}", Environment.NewLine, offsetAsString);
+                }
+
+                _consumer.Commit(listOffsets);
+                _lastFlushAt = flushTime;
             }
-           
-            if (s_logger.IsEnabled(LogLevel.Information))
+            finally
             {
-                var offsets = listOffsets.Select(tpo => $"Topic: {tpo.Topic} Partition: {tpo.Partition.Value} Offset: {tpo.Offset.Value}");
-                var offsetAsString = string.Join(Environment.NewLine, offsets);
-                s_logger.LogInformation("Sweeping offsets: {0} {Offset}", Environment.NewLine, offsetAsString);
+                _flushToken.Release(1);
             }
-           
-            _consumer.Commit(listOffsets);
-            _lastFlushAt = flushTime;
-            _flushToken.Release(1);
         }
 
         // The batch size has been exceeded, so flush our offsets
@@ -524,7 +549,7 @@ namespace Paramore.Brighter.MessagingGateway.Kafka
             catch (Exception ex)
             {
                 //this may happen if the offset is already committed
-                s_logger.LogDebug("Error committing the current offset to Kakfa before closing: {ErrorMessage}", ex.Message);
+                s_logger.LogDebug("Error committing the current offset to Kafka before closing: {ErrorMessage}", ex.Message);
             }
         }
 
